@@ -61,7 +61,7 @@ get_genid (char *host)
   KCDB* db;
   char *vbuf;
   size_t vsiz;
-  int answer;
+  int answer = 0;
   int host_size;
 
   /* create the database object */
@@ -69,26 +69,26 @@ get_genid (char *host)
 
   /* open the database */
   if (!kcdbopen(db, genid_kyoto_db, KCOREADER | KCONOLOCK)) {
-    TSDebug(PLUGIN_NAME, "could not open the genid database %s\n", genid_kyoto_db);
-    TSError("[%s] could not open the genid database\n", PLUGIN_NAME);
+    TSDebug(PLUGIN_NAME, "could not open the genid database %s", genid_kyoto_db);
+    TSError("[%s] could not open the genid database %s: %s",
+            PLUGIN_NAME, genid_kyoto_db, strerror(errno));
     return 0;
   }
 
   vbuf = kcdbget(db, host, strlen(host), &vsiz);
 
   if (vbuf) {
-    TSDebug(PLUGIN_NAME, "kcdbget(%s) = %s\n", host, vbuf);
+    TSDebug(PLUGIN_NAME, "kcdbget(%s) = %s", host, vbuf);
     answer = (int) strtol(vbuf, NULL, 10);
     kcfree(vbuf);
-    kcdbclose(db);
-    return answer;
   } else {
     host_size = strlen(host);
-    TSDebug(PLUGIN_NAME, "kcdbget(%s) - no record found, len(%d)\n", host, host_size);
+    TSDebug(PLUGIN_NAME, "kcdbget(%s) - no record found, len(%d)", host, host_size);
+    answer = 0;
   }
 
   kcdbclose(db); 
-  return 0;
+  return answer;
 }
 
 /* handle_hook
@@ -100,19 +100,19 @@ static int
 handle_hook(TSCont *contp, TSEvent event, void *edata)
 {
   TSHttpTxn txnp = (TSHttpTxn) edata;
-  char *url = NULL, *newurl = NULL, *host = NULL;
+  char *url = NULL, *host = NULL;
   int url_length;
   int gen_id;
   int ok = 1;
 
   switch (event) {
   case TS_EVENT_HTTP_READ_REQUEST_HDR:
-    TSDebug(PLUGIN_NAME, "handling TS_EVENT_HTTP_READ_REQUEST_HDR\n");
+    TSDebug(PLUGIN_NAME, "handling TS_EVENT_HTTP_READ_REQUEST_HDR");
 
     if (ok) {
       url = TSHttpTxnEffectiveUrlStringGet(txnp, &url_length);
       if (!url) {
-        TSError("[%s] could not retrieve request url\n", PLUGIN_NAME);
+        TSError("[%s] could not retrieve request url", PLUGIN_NAME);
         ok = 0;
       }
     }
@@ -120,17 +120,17 @@ handle_hook(TSCont *contp, TSEvent event, void *edata)
     if (ok) {
       get_genid_host(&host, url);
       if (!host) {
-        TSError("[%s] could not retrieve request host\n", PLUGIN_NAME);
+        TSError("[%s] could not retrieve request host", PLUGIN_NAME);
         ok = 0;
       }
     }
 
     if (ok) {
-      TSDebug(PLUGIN_NAME, "From url (%s) discovered host (%s)\n", url, host);
+      TSDebug(PLUGIN_NAME, "From url (%s) discovered host (%s)", url, host);
       if ((gen_id = get_genid(host)) != 0) {
         if (TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_GENERATION, gen_id) != TS_SUCCESS) {
-          TSDebug(PLUGIN_NAME, "Error, unable to modify cache url\n");
-          TSError("[%s] Unable to modify cache url from %s to %s\n", PLUGIN_NAME, url, newurl);
+          TSDebug(PLUGIN_NAME, "Error, unable to modify cache url");
+          TSError("[%s] Unable to set cache generation for %s to %d", PLUGIN_NAME, url, gen_id);
           ok = 0;
         }
       }
@@ -139,8 +139,6 @@ handle_hook(TSCont *contp, TSEvent event, void *edata)
     /* Clean up */
     if (url)
       TSfree(url);
-    if (newurl)
-      TSfree(newurl);
     if (host)
       TSfree(host);
     TSHttpTxnReenable(txnp, TS_EVENT_HTTP_CONTINUE);
