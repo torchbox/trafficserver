@@ -35,6 +35,9 @@
 #include <vector>
 #include <set>
 
+#ifndef INT64_MAX
+# define INT64_MAX 0x7fffffffffffffffLL
+#endif
 
 #include "ats_pagespeed.h"
 
@@ -1186,7 +1189,7 @@ process_configuration()
   DIR *dir;
   struct dirent *ent;
 
-  if ((dir = opendir("/usr/local/etc/trafficserver/psol/")) != NULL) {
+  if ((dir = opendir("/etc/tbx/ts/psol/")) != NULL) {
     while ((ent = readdir(dir)) != NULL) {
       size_t len = strlen(ent->d_name);
       if (len <= 0)
@@ -1197,7 +1200,7 @@ process_configuration()
         continue;
       if (ent->d_name[0] == '#')
         continue;
-      GoogleString s("/usr/local/etc/trafficserver/psol/");
+      GoogleString s("/etc/tbx/ts/psol/");
       s.append(ent->d_name);
       fprintf(stderr, "parse [%s]\n", s.c_str());
       if (!new_config->Parse(s.c_str())) {
@@ -1232,7 +1235,7 @@ config_notification_callback(void *data)
     CHECK(false) << "Failed to initialize inotify";
   }
 
-  wd = inotify_add_watch(fd, "/usr/local/etc/trafficserver/psol/", IN_MODIFY | IN_CREATE | IN_DELETE);
+  wd = inotify_add_watch(fd, "/etc/tbx/ts/psol/", IN_MODIFY | IN_CREATE | IN_DELETE);
 
   while (1) {
     int len = read(fd, buf, BUF_MAX);

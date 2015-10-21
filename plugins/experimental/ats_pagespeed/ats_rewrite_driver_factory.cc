@@ -73,13 +73,13 @@ AtsRewriteDriverFactory::AtsRewriteDriverFactory(const ProcessContext &process_c
   default_options()->SetRewriteLevel(RewriteOptions::kCoreFilters);
 
   SystemRewriteOptions *system_options = dynamic_cast<SystemRewriteOptions *>(default_options());
-  system_options->set_log_dir("/tmp/ps_log/");
+  system_options->set_log_dir("/var/trafficserver/ps_log/");
   system_options->set_statistics_logging_enabled(true);
 
   system_options->set_file_cache_clean_inode_limit(500000);
   system_options->set_file_cache_clean_size_kb(1024 * 10000); // 10 GB
   system_options->set_avoid_renaming_introspective_javascript(true);
-  system_options->set_file_cache_path("/tmp/ats_ps/");
+  system_options->set_file_cache_path("/var/trafficserver/ats_ps/");
   system_options->set_lru_cache_byte_limit(163840);
   system_options->set_lru_cache_kb_per_process(1024 * 500); // 500 MB
 
