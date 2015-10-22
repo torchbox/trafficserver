@@ -162,7 +162,7 @@ TSPluginInit(int argc, const char *argv[])
   info.vendor_name = (char *)"Apache Software Foundation";
   info.support_email = (char *)"dev@trafficserver.apache.org";
 
-  if (argc == 1) {
+  if (argc > 1) {
     TSstrlcpy(genid_kyoto_db, argv[1], sizeof(genid_kyoto_db));
   } else {
     TSError("[%s] plugin registration failed. check argv[1] for db path", PLUGIN_NAME);
