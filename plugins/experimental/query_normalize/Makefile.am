@@ -14,44 +14,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-SUBDIRS = \
- authproxy \
- background_fetch \
- balancer \
- buffer_upload \
- cache_range_requests \
- cache_promote \
- collapsed_connection \
- custom_redirect \
- epic \
- escalate \
- esi \
- generator \
- geoip_acl \
- header_normalize \
- healthchecks \
- hipes \
- metalink \
- query_normalize \
- regex_revalidate \
- remap_stats \
- s3_auth \
- ssl_cert_loader \
- sslheaders \
- stale_while_revalidate \
- url_sig \
- xdebug \
- mp4 \
- stream_editor
+include $(top_srcdir)/build/plugins.mk
 
-if HAS_MYSQL
-  SUBDIRS += mysql_remap
-endif
-
-if BUILD_LUAJIT
-  SUBDIRS += ts_lua
-endif
-
-if HAS_KYOTOCABINET
-  SUBDIRS += cache_key_genid
-endif
+pkglib_LTLIBRARIES = query_normalize.la
+query_normalize_la_SOURCES = query_normalize.c
+query_normalize_la_LDFLAGS = $(TS_PLUGIN_LDFLAGS)
