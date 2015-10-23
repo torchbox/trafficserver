@@ -1185,8 +1185,9 @@ process_configuration()
   AtsConfig *new_config = new AtsConfig((AtsThreadSystem *)ats_process_context->server_context()->thread_system());
   DIR *dir;
   struct dirent *ent;
+  std::string psol_dir = std::string(TSConfigDirGet()) + "psol/";
 
-  if ((dir = opendir("/usr/local/etc/trafficserver/psol/")) != NULL) {
+  if ((dir = opendir(psol_dir.c_str())) != NULL) {
     while ((ent = readdir(dir)) != NULL) {
       size_t len = strlen(ent->d_name);
       if (len <= 0)
@@ -1197,7 +1198,7 @@ process_configuration()
         continue;
       if (ent->d_name[0] == '#')
         continue;
-      GoogleString s("/usr/local/etc/trafficserver/psol/");
+      GoogleString s(psol_dir);
       s.append(ent->d_name);
       fprintf(stderr, "parse [%s]\n", s.c_str());
       if (!new_config->Parse(s.c_str())) {
@@ -1232,7 +1233,8 @@ config_notification_callback(void *data)
     CHECK(false) << "Failed to initialize inotify";
   }
 
-  wd = inotify_add_watch(fd, "/usr/local/etc/trafficserver/psol/", IN_MODIFY | IN_CREATE | IN_DELETE);
+  std::string psol_dir = std::string(TSConfigDirGet()) + "psol/";
+  wd = inotify_add_watch(fd, psol_dir.c_str(), IN_MODIFY | IN_CREATE | IN_DELETE);
 
   while (1) {
     int len = read(fd, buf, BUF_MAX);

@@ -20,6 +20,7 @@ TSXS?=tsxs
 BUILDTYPE?=Release
 MOD_PAGESPEED_DIR=$(shell pwd)/psol/include/
 PAGESPEED_OUT=$(shell pwd)/psol/lib/$(BUILDTYPE)/linux/x64/
+TS_INC=$(shell tsxs -qINCLUDEDIR)
 
 
 os_name=unknown_os
@@ -29,16 +30,24 @@ uname_arch=$(shell uname -m)
 
 ifeq ($(uname_os),Linux)
   os_name=linux
+
+  ifeq ($(uname_arch), x86_64)
+    arch_name=x64
+  endif
+  ifeq ($(uname_arch), amd64)
+    arch_name=x64
+  endif
 endif
 
-ifeq ($(uname_arch), x86_64)
-  arch_name=x64
-endif
-ifeq ($(uname_arch), amd64)
-  arch_name=x64
+ifeq ($(uname_os),Darwin)
+  os_name=mac
+
+  ifeq ($(uname_arch), x86_64)
+    arch_name=ia32
+  endif
 endif
 
-INC =-I$(MOD_PAGESPEED_DIR)\
+INC =-I$(TS_INC) -I$(MOD_PAGESPEED_DIR)\
  -I$(MOD_PAGESPEED_DIR)third_party/chromium/src/\
  -I$(MOD_PAGESPEED_DIR)third_party/google-sparsehash/src\
  -I$(MOD_PAGESPEED_DIR)third_party/google-sparsehash/gen/arch/$(os_name)/$(arch_name)/include\
@@ -57,7 +66,7 @@ PSOL_LIBS = $(PAGESPEED_OUT)pagespeed_automatic.a
 
 %.so: psol %.cc
 # https://github.com/pagespeed/ngx_pagespeed/issues/433: it would be nice to have -Wall -Werror, only suppressing when needed.
-	g++ $(INC) -shared -o ats_pagespeed.so -g -pipe -O3 -fpic *.cc -lstdc++ -lstdc++  -lpthread $(PSOL_LIBS) -lrt
+	g++ $(INC) -I -shared -o ats_pagespeed.so -g -pipe -O3 -fpic *.cc -lstdc++ -lpthread $(PSOL_LIBS) -lrt
 
 all: psol gzip/gzip.so ats_pagespeed.so
 
