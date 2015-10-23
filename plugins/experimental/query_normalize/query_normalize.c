@@ -1,24 +1,59 @@
 /*
  * Copyright (c) 2015 Torchbox Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");    
- * you may not use this file except in compliance with the License.    
- * You may obtain a copy of the License at        
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0    
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software    
- * distributed under the License is distributed on an "AS IS" BASIS,    
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.    
- * See the License for the specific language governing permissions and    
- * limitations under the License. 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /* query_normalize: normalise (sort) request query parameters,
  * optionally removing undesired parameters.
+ *
+ * why?  some URL parameters, like Google utm_ ones, don't affect page
+ * content, yet still cause pages to be duplicated in the cache.  for
+ * example,
+ *   http://example.com/
+ * and
+ *   http://example.com/?utm_campaign=newsletter
+ * are different URLs, and will be cached differently, wasting cache space and
+ * reducing cache hit rate because the page has to be cached twice, once at
+ * each URL.  even worse, when you update content on http://example.com/ and
+ * PURGE the cache, the '?utm_campaign=newsletter' version will still show the
+ * old content.
+ *
+ * query_normalize fixes both of these problems by removing unwanted query
+ * parameters from client requests.
+ *
+ * usage in plugins.config:
+ *
+ * Remove ('-') the 'utm_campaign' parameter from query strings:
+ *   query_normalize.so -utm_campaign
+ *
+ * Remove ('-') two parameters and also sort ('$') the remaining query
+ * parameters:
+ *   query_normalize.so $-utm_campaign,utm_medium
+ *
+ * Only allow 'page', 'sort' and 'limit' parameters through ('+'), and
+ * sort them ('$'):
+ *   query_normalize.so $+page,sort,limit
+ *
+ * usage in remap.config:
+ *
+ *   map http://example.com/ http://backend.example.com/ \
+ *     @plugin=query_normalize.so @pparam=-utm_campaign,utm_medium
  */
 
 #include <ts/ts.h>
+#include <ts/remap.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -29,6 +64,7 @@
 #define QN_MODE_DENY    0x2
 #define QN_MODE_MASK    0x3
 #define QN_CACHEURL     0x4
+#define QN_SORT         0x8
 
 typedef struct qn_config {
   int flags;
@@ -50,11 +86,11 @@ parse_config(qn_config_t *conf, char const *optstr)
 {
   const char *p, *q, *r;
   int n;
-  
+
   memset(conf, 0, sizeof(*conf));
 
   /* Parse flags */
-  for (; strchr("+-%", *optstr); optstr++) {
+  for (; strchr("+-$%", *optstr); optstr++) {
     switch (*optstr) {
       case '+':
         conf->flags = (conf->flags & ~QN_MODE_MASK) | QN_MODE_PERMIT;
@@ -66,6 +102,10 @@ parse_config(qn_config_t *conf, char const *optstr)
 
       case '%':
         conf->flags |= QN_CACHEURL;
+        break;
+
+      case '$':
+        conf->flags |= QN_SORT;
         break;
     }
   }
@@ -84,7 +124,7 @@ parse_config(qn_config_t *conf, char const *optstr)
 
     if ((end = memchr(p, '&', (q - p) + 1)) == NULL)
       end = q;
-    
+
     conf->params[n] = calloc(1, (end - p) + 1);
     memcpy(conf->params[n], p, (end - p));
     n++;
@@ -143,7 +183,7 @@ normalise_request(TSHttpTxn txnp, qn_config_t *config)
     TSDebug(PLUGIN_NAME, "normalize_request: TSHttpTxnClientReqGet failed");
     return;
   }
-  
+
   /* Fetch the URL from the request */
   if (TSHttpHdrUrlGet(bufp, offset, &url_mloc) != TS_SUCCESS) {
     TSDebug(PLUGIN_NAME, "normalize_request: TSHttpHdrUrlGet failed");
@@ -178,7 +218,7 @@ normalise_request(TSHttpTxn txnp, qn_config_t *config)
 
     if ((end = memchr(p, '&', (q - p) + 1)) == NULL)
       end = q;
-    
+
     /* Skip empty parameters */
     if ((end - p) == 0) {
       p = end + 1;
@@ -203,7 +243,7 @@ normalise_request(TSHttpTxn txnp, qn_config_t *config)
       free(parm);
       continue;
     }
-    
+
     if (tparm)
       *tparm = '=';
 
@@ -215,7 +255,11 @@ normalise_request(TSHttpTxn txnp, qn_config_t *config)
 
   nparams = n;
 
-  qsort(&params[0], nparams, sizeof(char *), sort_cmp);
+  /* Sort parameters if requested */
+  if (config->flags & QN_SORT)
+    qsort(&params[0], nparams, sizeof(char *), sort_cmp);
+
+  /* Collapse the array back into a query string */
   new_query = calloc(1, query_length + 1);
   for (n = 0; n < nparams; n++) {
     if (n)
@@ -225,9 +269,11 @@ normalise_request(TSHttpTxn txnp, qn_config_t *config)
 
   TSDebug(PLUGIN_NAME, "reordered query [%s]", new_query);
 
+  /* Replace the query in the original request */
   if (TSUrlHttpQuerySet(bufp, url_mloc, new_query, -1) != TS_SUCCESS)
     TSDebug(PLUGIN_NAME, "TSUrlHttpQuerySet failed");
 
+  /* Free resources */
   for (n = 0; n < nparams; n++)
     free(params[n]);
   free(params);
@@ -255,4 +301,58 @@ TSPluginInit(int argc, const char *argv[])
   }
 
   TSHttpHookAdd(TS_HTTP_READ_REQUEST_HDR_HOOK, TSContCreate((TSEventFunc)handle_hook, NULL));
+}
+
+TSReturnCode
+TSRemapInit(TSRemapInterface *api_info, char *errbuf, int errbuf_size)
+{
+  if (!api_info) {
+    strncpy(errbuf, "[tsremap_init] - Invalid TSRemapInterface argument", (size_t)(errbuf_size - 1));
+    return TS_ERROR;
+  }
+
+  if (api_info->tsremap_version < TSREMAP_VERSION) {
+    snprintf(errbuf, errbuf_size - 1, "[TSRemapInit] - Incorrect API version %ld.%ld", api_info->tsremap_version >> 16,
+             (api_info->tsremap_version & 0xffff));
+    return TS_ERROR;
+  }
+
+  TSDebug(PLUGIN_NAME, "plugin is succesfully initialized");
+  return TS_SUCCESS;
+}
+
+TSReturnCode
+TSRemapNewInstance(int argc, char *argv[], void **ih, char *errbuf, int errbuf_size)
+{
+  qn_config_t *config = NULL;
+
+  config = calloc(1, sizeof(*config));
+  if (argc > 2)
+    parse_config(config, argv[2]);
+
+  *ih = config;
+  return TS_SUCCESS;
+}
+
+void
+TSRemapDeleteInstance(void *ih)
+{
+  qn_config_t *config = ih;
+  int i;
+
+  if (!config)
+    return;
+
+  for (i = 0; i < config->nparams; i++)
+    free(config->params[i]);
+  free(config->params);
+  free(config);
+}
+
+TSRemapStatus
+TSRemapDoRemap(void *ih, TSHttpTxn txnp, TSRemapRequestInfo *rri)
+{
+  qn_config_t *config = ih;
+  normalise_request(txnp, config);
+  return TSREMAP_DID_REMAP;
 }
