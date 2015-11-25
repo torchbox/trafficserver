@@ -894,6 +894,10 @@ Http2ConnectionState::send_data_frame(FetchSM *fetch_sm)
 {
   DebugSsn(this->ua_session, "http2_cs", "[%" PRId64 "] Send DATA frame", this->ua_session->connection_id());
 
+  if (fetch_sm == NULL) {
+    return;
+  }
+
   size_t buf_len = BUFFER_SIZE_FOR_INDEX(buffer_size_index[HTTP2_FRAME_TYPE_DATA]) - HTTP2_FRAME_HEADER_LEN;
   uint8_t payload_buffer[buf_len];
 
