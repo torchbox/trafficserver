@@ -114,7 +114,6 @@ handle_hook(TSCont *contp, TSEvent event, void *edata)
     if (ok) {
       url = TSHttpTxnEffectiveUrlStringGet(txnp, &url_length);
       if (!url) {
-        TSError("[%s] could not retrieve request url", PLUGIN_NAME);
         ok = 0;
       }
     }
@@ -122,7 +121,6 @@ handle_hook(TSCont *contp, TSEvent event, void *edata)
     if (ok) {
       get_genid_host(&host, url);
       if (!host) {
-        TSError("[%s] could not retrieve request host", PLUGIN_NAME);
         ok = 0;
       }
     }
@@ -131,7 +129,7 @@ handle_hook(TSCont *contp, TSEvent event, void *edata)
       TSDebug(PLUGIN_NAME, "From url (%s) discovered host (%s)", url, host);
       if ((gen_id = get_genid(host)) != 0) {
         if (TSHttpTxnConfigIntSet(txnp, TS_CONFIG_HTTP_CACHE_GENERATION, gen_id) != TS_SUCCESS) {
-          TSDebug(PLUGIN_NAME, "Error, unable to modify cache url");
+          TSDebug(PLUGIN_NAME, "Error, unable to set cache generation id for %s to %d", url, gen_id);
           TSError("[%s] Unable to set cache generation for %s to %d", PLUGIN_NAME, url, gen_id);
           ok = 0;
         }
