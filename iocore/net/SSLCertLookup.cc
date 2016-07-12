@@ -358,10 +358,6 @@ SSLContextStorage::insert(const char *name, int idx)
       // Fail even if we are reinserting the exact same value
       // Otherwise we cannot detect and recover from a double insert
       // into the references array
-      if (found != NULL) {
-        Warning("previously indexed wildcard certificate for '%s' as '%s', cannot index it with SSL_CTX #%d now", name, reversed,
-                idx);
-      }
       idx = -1;
     } else {
       ref.release(); // it's the hands of the Trie now, forget it and move on.
@@ -373,7 +369,6 @@ SSLContextStorage::insert(const char *name, int idx)
     InkHashTableValue value;
 
     if (ink_hash_table_lookup(this->hostnames, name, &value) && reinterpret_cast<InkHashTableValue>(idx) != value) {
-      Warning("previously indexed '%s' with SSL_CTX %p, cannot index it with SSL_CTX #%d now", name, value, idx);
       idx = -1;
     } else {
       ink_hash_table_insert(this->hostnames, name, reinterpret_cast<void *>(static_cast<intptr_t>(idx)));
