@@ -170,6 +170,16 @@ test_parsing()
     CHECK_EQ(p.getTokens()[2], "true");
   }
 
+  {
+    ParserTest p("cond %{HEADER:Cookie} \"/session=|sessionid=|csrftoken=|SESS[0-9A-Za-z]*=|_shibsession_[0-9A-Za-z]*=/\" [NOT]");
+    fprintf(stderr, "[%s] [%s] [%s] [%s]\n", p.getTokens()[0].c_str(), p.getTokens()[1].c_str(), p.getTokens()[2].c_str(), p.getTokens()[3].c_str());
+    CHECK_EQ(p.getTokens().size(), 4);
+    CHECK_EQ(p.getTokens()[0], "cond");
+    CHECK_EQ(p.getTokens()[1], "%{HEADER:Cookie}");
+    CHECK_EQ(p.getTokens()[2], "/session=|sessionid=|csrftoken=|SESS[0-9A-Za-z]*=|_shibsession_[0-9A-Za-z]*=/");
+    CHECK_EQ(p.getTokens()[3], "[NOT]");
+  }
+
   /*
    * test some failure scenarios
    */
