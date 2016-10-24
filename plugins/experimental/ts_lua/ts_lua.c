@@ -22,7 +22,7 @@
 
 #include "ts_lua_util.h"
 
-#define TS_LUA_MAX_STATE_COUNT 256
+#define TS_LUA_MAX_STATE_COUNT 64
 
 static uint64_t ts_lua_http_next_id   = 0;
 static uint64_t ts_lua_g_http_next_id = 0;
