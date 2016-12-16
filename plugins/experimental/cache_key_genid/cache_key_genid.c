@@ -68,6 +68,7 @@ get_genid(char *host)
   if (!kcdbopen(db, genid_kyoto_db, KCOREADER | KCONOLOCK)) {
     TSDebug(PLUGIN_NAME, "could not open the genid database %s", genid_kyoto_db);
     TSError("[%s] could not open the genid database %s: %s", PLUGIN_NAME, genid_kyoto_db, strerror(errno));
+    kcdbdel(db);
     return 0;
   }
 
@@ -84,6 +85,7 @@ get_genid(char *host)
   }
 
   kcdbclose(db);
+  kcdbdel(db);
   return answer;
 }
 
